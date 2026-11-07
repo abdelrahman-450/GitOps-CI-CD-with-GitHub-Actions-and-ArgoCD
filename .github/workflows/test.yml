@@ -22,11 +22,10 @@ jobs:
 
       - name: Test Container
         run: |
-          curl --fail \
-            --retry 10 \
-            --retry-delay 3 \
-            --retry-connrefused \
-            http://localhost:3000
+          sleep 10
+          docker ps
+          curl --fail http://localhost:3000
+
 
       - name: Show Container Logs
         if: always()
