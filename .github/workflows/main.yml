@@ -1,23 +1,26 @@
 
-name: Docker CI Pipeline
+name: Docker CI CD Approval Pipeline
 
 on:
   push:
     branches:
       - Master
+    paths:
+      - 'src/**'
+      - 'Dockerfile'
 
 jobs:
   docker-ci:
     runs-on: [self-hosted, Linux, X64]
 
     steps:
-      - name: Checkout Source Code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build Docker Image
         run: docker build -t node-app:v1 .
 
-      - name: Run Docker Container
+      - name: Run Test Container
         run: |
           docker rm -f testcontainer || true
           docker run -d --name testcontainer -p 3000:3000 node-app:v1
@@ -27,26 +30,22 @@ jobs:
           sleep 10
           curl -f http://localhost:3000
 
-      - name: Show Container Logs
-        if: always()
-        run: docker logs testcontainer || true
-
       - name: Remove Test Container
         if: always()
         run: docker rm -f testcontainer || true
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+  deploy:
+    needs: docker-ci
+    runs-on: [self-hosted, Linux, X64]
+    environment: production
 
-      - name: Tag Docker Image
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: docker tag node-app:v1 $DOCKERHUB_USERNAME/node-app:v1
+    steps:
+      - name: Deploy Docker Container
+        run: |
+          docker rm -f production-app || true
+          docker run -d --name production-app -p 8080:3000 node-app:v1
 
-      - name: Push Docker Image
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: docker push $DOCKERHUB_USERNAME/node-app:v1
+      - name: Verify Deployment
+        run: |
+          sleep 10
+          curl -f http://localhost:8080
